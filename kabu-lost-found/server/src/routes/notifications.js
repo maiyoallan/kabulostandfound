@@ -1,0 +1,2 @@
+import {Router} from 'express';import {auth} from '../middleware/auth.js';import {prisma} from '../db.js';
+const r=Router();r.get('/',auth,async(req,res)=>res.json(await prisma.notification.findMany({where:{userId:req.user.id},orderBy:{createdAt:'desc'},take:50})));r.patch('/:id/read',auth,async(req,res)=>{const n=await prisma.notification.updateMany({where:{id:req.params.id,userId:req.user.id},data:{readAt:new Date()}});res.json({updated:n.count});});export default r;

@@ -1,0 +1,178 @@
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+enum ItemType {
+  FOUND
+  LOST
+}
+
+enum ItemStatus {
+  UNCLAIMED
+  CLAIM_PENDING
+  RESOLVED
+  REMOVED
+}
+
+enum ClaimStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  COMPLETED
+}
+
+enum NotificationType {
+  MATCH
+  CLAIM
+  MESSAGE
+  SYSTEM
+}
+
+model User {
+  id             String         @id @default(cuid())
+  email          String         @unique
+  username       String         @unique
+  passwordHash   String
+  role           Role           @default(USER)
+  emailVerifiedAt DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  items          Item[]
+  claimsMade     Claim[]        @relation("Claimant")
+  claimsReceived Claim[]        @relation("ItemOwner")
+  messages       Message[]
+  notifications  Notification[]
+  reports        Report[]
+  sessions       ChatSession[]
+}
+
+model ApprovedEmail {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  approvedById String?
+  createdAt    DateTime @default(now())
+}
+
+model EmailOtp {
+  id        String   @id @default(cuid())
+  email     String
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
+}
+
+model Item {
+  id             String     @id @default(cuid())
+  type           ItemType
+  title          String
+  category       String
+  description    String
+  secretQuestion String?
+  imageUrl       String?
+  location       String
+  customLocation String?
+  eventAt        DateTime
+  custody        String?
+  status         ItemStatus @default(UNCLAIMED)
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  claims         Claim[]
+  reports        Report[]
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@index([type, status, category])
+  @@index([location, eventAt])
+  @@index([title])
+}
+
+model Claim {
+  id                 String      @id @default(cuid())
+  itemId             String
+  claimantId         String
+  ownerId            String
+  verificationAnswer String
+  message            String?
+  status             ClaimStatus @default(PENDING)
+  item               Item        @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  claimant           User        @relation("Claimant", fields: [claimantId], references: [id], onDelete: Cascade)
+  owner              User        @relation("ItemOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  messages           Message[]
+  session            ChatSession?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  @@unique([itemId, claimantId])
+  @@index([ownerId, status])
+}
+
+model ChatSession {
+  id        String   @id @default(cuid())
+  claimId   String   @unique
+  claim     Claim    @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  users     User[]
+  createdAt DateTime @default(now())
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  claimId   String
+  senderId  String
+  body      String
+  claim     Claim    @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([claimId, createdAt])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  itemId    String?
+  readAt    DateTime?
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime         @default(now())
+
+  @@index([userId, readAt, createdAt])
+}
+
+model Report {
+  id         String   @id @default(cuid())
+  itemId     String
+  reporterId String
+  reason     String
+  status     String   @default("OPEN")
+  item       Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  reporter   User     @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+}
+
+model PasswordResetOtp {
+  id        String   @id @default(cuid())
+  email     String
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
+}
